@@ -62,3 +62,25 @@ void print_statistics(FILE* fp, struct MemoryStats stats) {
 int get_total_pages(int max_running_procs) {
     return max_running_procs * PROCESS_PAGES;
 }
+
+bool page_number_is_valid(int pid, int page_number) {
+    // Returns whether or not page_number is valid given pid
+    int start_index = pid * PROCESS_PAGES;
+    int end_index = (start_index + PROCESS_PAGES) - 1;
+    if (page_number < start_index || page_number > end_index) {
+        return 0;
+    }
+    return 1;
+}
+
+int get_frame_from_main_memory(struct MainMemory main_mem, int page_number) {
+    // Returns frame number of page if it is in main memory
+    int i;
+    for (i = 0; i < MAIN_MEMORY_SZE; i++) {
+        if (page_number != main_mem.memory[i]) {
+            continue;
+        }
+        return i;
+    }
+    return -1;
+}

@@ -23,6 +23,8 @@ void handle_sigterm(int sig);
 int get_random_valid_page_number(int page_tbl_start_idx);
 int get_invalid_page_number(int page_tbl_start_idx);
 int get_page_number(int page_tbl_start_idx);
+void send_termination_notification(int mem_msg_box_id, int pid);
+int get_num_mem_references();
 
 void get_reference_type(char* reference_type);
 
@@ -47,6 +49,8 @@ int main (int argc, char *argv[]) {
 
     // Declare variables
     int page_tbl_start_idx = pid * PROCESS_PAGES;
+    int references_before_terminating = get_num_mem_references();
+    int num_requests = 0;
     int page_number;
     struct msgbuf mem_msg_box;
     char reference_type[6];
@@ -56,7 +60,7 @@ int main (int argc, char *argv[]) {
         get_reference_type(reference_type);
         
         page_number = get_page_number(page_tbl_start_idx);
-        
+
         // Create message for OSS
         sprintf(mem_msg_box.mtext, "%d,%s,%d", pid, reference_type, page_number);
 
@@ -64,10 +68,19 @@ int main (int argc, char *argv[]) {
         send_msg(mem_msg_box_id, &mem_msg_box, pid);
         
         // Blocking Receive - wait until OSS grants request
-        receive_msg(mem_msg_box_id, &mem_msg_box, pid+MAX_PROC_CNT);
-    }
+        receive_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
+        
+        if (num_requests == references_before_terminating) {
+            // Check to see if process will terminate
+            if (will_terminate()) {
+                send_termination_notification(mem_msg_box_id, pid);
+                break;
+            }
+            references_before_terminating += get_num_mem_references();
+        }
 
-    printf("page table [234] = %d\n", page_table[234]);
+        num_requests++;
+    }
 
     return 0;  
 }
@@ -126,4 +139,16 @@ void get_reference_type(char* reference_type) {
     else { // write memory
         sprintf(reference_type, "WRITE");
     } 
+}
+
+void send_termination_notification(int mem_msg_box_id, int pid) {
+    struct msgbuf mem_msg_box;
+    sprintf(mem_msg_box.mtext, "%d,TERM,0", pid);
+    send_msg(mem_msg_box_id, &mem_msg_box, pid); 
+}
+
+int get_num_mem_references() {
+    int base = 900;
+    int random_offset = rand() % 200;
+    return base + random_offset;
 }

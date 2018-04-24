@@ -38,6 +38,7 @@ void init_childpid_array();
 void open_file_for_writing(char* filename);
 struct MainMemory get_main_memory();
 void print_exit_reason(int proc_cnt);
+int get_request_time(struct message msg);
 
 // Globals used in signal handler
 int max_running_procs;
@@ -83,6 +84,7 @@ int main (int argc, char* argv[]) {
     struct msqid_ds msgq_ds;                         // Used to check number of messages in msg box
     struct MainMemory main_mem = get_main_memory();  // Simulated main memory
     struct MemoryStats stats = get_memory_stats();   // Used to report statistics
+    int frame_number, request_time;
 
     // Setup execv array to pass initial data to children processes
     char* execv_arr[EXECV_SIZE];                
@@ -143,12 +145,28 @@ int main (int argc, char* argv[]) {
         num_messages = msgq_ds.msg_qnum;
 
         // Check for any messages
-        while (num_messages-- > 0) {
+        while (num_messages > 0) {
             printf("found a message\n");
             
             receive_msg(mem_msg_box_id, &mem_msg_box, 0);
             msg = parse_msg(mem_msg_box.mtext);
             
+            request_time = get_request_time(msg);
+
+            if (strcmp(msg.type, "TERM") != 0) {
+                frame_number = get_frame_from_main_memory(main_mem, msg.page);
+                if (frame_number < 0) {
+                    // Page fault
+                    // so add process to blocked queue
+                }
+                else {
+                    // Valid
+                }
+            }
+            else {
+                // process terminated
+            }
+
             sprintf(buffer, "\n");
             print_and_write(buffer, fp);
 
@@ -361,4 +379,14 @@ void print_exit_reason(int proc_cnt) {
 
     sprintf(buffer, "\n");
     print_and_write(buffer, fp);
+}
+
+int get_request_time(struct message msg) {
+    if (strcmp(msg.type, "READ") == 0) {
+        return 10; // nanoseconds
+    }
+    else if (strcmp(msg.type, "WRITE") == 0) {
+        return 20; // nanseconds
+    }
+    return 0;
 }

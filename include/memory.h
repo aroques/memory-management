@@ -28,5 +28,7 @@ void init_page_table(int* page_table, int max_running_procs);
 void print_statistics(FILE* fp, struct MemoryStats stats);
 struct MemoryStats get_memory_stats();
 int get_total_pages(int max_running_procs);
+bool page_number_is_valid(int pid, int page_number);
+int get_frame_from_main_memory(struct MainMemory main_mem, int page_number);
 
 #endif
