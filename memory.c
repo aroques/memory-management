@@ -108,3 +108,14 @@ void free_frames(int* main_mem, int* page_table, int pid) {
     }
     return;
 }
+
+void add_page_to_main_memory(int* main_mem, int page_number) {
+    int i;
+    for (i = 0; i < MAIN_MEMORY_SZE; i++) {
+        if (main_mem[i] != 0) {
+            continue;
+        }
+        // Frame is free
+        main_mem[i] = page_number;
+    }
+}

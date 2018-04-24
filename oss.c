@@ -41,6 +41,7 @@ void print_exit_reason(int proc_cnt);
 int get_request_time(struct message msg);
 bool page_fault(int frame_number);
 void kill_process(int pid);
+bool is_unblocked(int pid, struct clock* time_unblocked);
 
 #define FIFTEEN_MILLION 15000000
 
@@ -59,6 +60,11 @@ struct message {
     int page;
 };
 
+struct BlockedInfo {
+    int page_number;
+    struct clock time_unblocked;
+    char* type_of_request[6];
+}
 
 int main (int argc, char* argv[]) {
     const unsigned int TOTAL_RUNTIME = 2;       // Max seconds oss should run for
@@ -86,11 +92,13 @@ int main (int argc, char* argv[]) {
     struct msqid_ds msgq_ds;                         // Used to check number of messages in msg box
     struct MainMemory main_mem = get_main_memory();  // Simulated main memory
     struct MemoryStats stats = get_memory_stats();   // Used to report statistics
-    int frame_number, request_time;
-    struct clock time_unblocked[max_running_procs];         // Holds clock of time process i was blocked
+    int frame_number, request_time, page_number;
+    struct BlockedInfo blocked_info[max_running_procs];
     for (i = 0; i < max_running_procs; i++) {
-        time_unblocked[i] = get_clock();
+        blocked_info.time_unblocked[i] = get_clock();
+        page_number = 0;
     }
+    struct BlockedInfo blkd_info;
     struct Queue blocked;
     init_queue(&blocked);
 
@@ -148,6 +156,25 @@ int main (int argc, char* argv[]) {
             time_to_fork = get_time_to_fork_new_proc(*sysclock);
         }
 
+        // Check blocked queue
+        pid = peek(&blocked);
+        if (is_unblocked(pid, time_unblocked)) {
+            sprintf(buffer, "OSS: P%d requested %s access on page %d and page faulted at time %ld:%'ld.\n     Adding process to blocked queue.\n",
+                pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+            print_and_write(buffer, fp);
+            // 
+            blkd_info = blocked_info[pid];
+            page_number = blkd_info.page_number;
+
+            // Add page to main memory
+            // need to check if main memory is full and if it is then run a page swap algorithm
+            add_page_to_main_memory(main_mem.memory, page_number);
+
+            // Remove from blocked queue
+            dequeue(&blocked);
+
+        }
+
         // Get number of messages
         msgctl(mem_msg_box_id, IPC_STAT, &msgq_ds);
         num_messages = msgq_ds.msg_qnum;
@@ -167,6 +194,7 @@ int main (int argc, char* argv[]) {
                     sprintf(buffer, "OSS: P%d seg faulted and will be terminated at time %ld:%'ld.\n",
                         pid, sysclock->seconds, sysclock->nanoseconds);
                     print_and_write(buffer, fp);
+                    
                     // Kill process
                     kill_process(pid);
                     
@@ -182,15 +210,20 @@ int main (int argc, char* argv[]) {
                     
                     if (page_fault(frame_number)) {
                         // Page fault
-                        sprintf(buffer, "OSS: P%d requested %s access on page %d and page faulted at time %ld:%'ld.\n
-                            Adding process to blocked queue.\n",
+                        sprintf(buffer, "OSS: P%d requested %s access on page %d and page faulted at time %ld:%'ld.\n     Adding process to blocked queue.\n",
                             pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
                         print_and_write(buffer, fp);
                         
+                        // Store blocked information
+                        blkd_info.page_number = msg.page;
+                        sprintf(blkd_info.type_of_request, msg.txt);
                         // Write out time process will be unblocked
-                        time_unblocked[pid] = *sysclock;
-                        increment_clock(&time_unblocked[pid], FIFTEEN_MILLION); // 15ms
+                        blkd_info.time_unblocked = *sysclock;
+                        increment_clock(&blkd_info.time_unblocked, FIFTEEN_MILLION); // 15ms
                         
+                        // Store blocked information in array
+                        blocked_info[pid] = blkd_info;
+
                         // Add process to blocked queue
                         enqueue(&blocked, pid);
                     }
@@ -208,6 +241,7 @@ int main (int argc, char* argv[]) {
                 sprintf(buffer, "OSS: Acknowledging P%d terminated at time %ld:%'ld\n",
                     pid, sysclock->seconds, sysclock->nanoseconds);
                 print_and_write(buffer, fp);
+                
                 // Free page numbers in main memory and frame numbers in page table
                 free_frames(main_mem.memory, page_table, pid);
                 
@@ -445,6 +479,16 @@ int get_request_time(struct message msg) {
 
 bool page_fault(int frame_number) {
     if (frame_number < 0) {
+        return 1;
+    }
+    return 0;
+}
+
+bool is_unblocked(int pid, struct clock* time_unblocked) {
+    // rework for new blocked info struct
+    struct clock unblocked_time = time_unblocked[pid];
+
+    if (compare_clocks(*sysclock, unblocked_time) >=  0) {
         return 1;
     }
     return 0;
