@@ -40,6 +40,7 @@ struct MainMemory get_main_memory();
 void print_exit_reason(int proc_cnt);
 int get_request_time(struct message msg);
 bool page_fault(int frame_number);
+void kill_process(int pid);
 
 #define FIFTEEN_MILLION 15000000
 
@@ -152,9 +153,7 @@ int main (int argc, char* argv[]) {
         num_messages = msgq_ds.msg_qnum;
 
         // Check for any messages
-        while (num_messages > 0) {
-            printf("found a message\n");
-            
+        while (num_messages-- > 0) {
             receive_msg(mem_msg_box_id, &mem_msg_box, 0);
             msg = parse_msg(mem_msg_box.mtext);
             
@@ -162,26 +161,46 @@ int main (int argc, char* argv[]) {
             request_time = get_request_time(msg);
 
             if (strcmp(msg.txt, "TERM") != 0) {
+                // Process is requesting memory to be read from or written to
                 if (!page_number_is_valid(pid, msg.page)) {
-                    // seg fault
-                    // so temrinatate/kill process and free frames
-                }
-
-                frame_number = get_frame_from_main_memory(main_mem.memory, msg.page);
-                
-                if (page_fault(frame_number)) {
-                    // Page fault
-                    // so add process to blocked queue
-                    time_unblocked[pid] = *sysclock;
-                    increment_clock(&time_unblocked[pid], FIFTEEN_MILLION);
-                    enqueue(&blocked, pid);
+                    // Seg Fault
+                    sprintf(buffer, "OSS: P%d seg faulted and will be terminated at time %ld:%'ld.\n",
+                        pid, sysclock->seconds, sysclock->nanoseconds);
+                    print_and_write(buffer, fp);
+                    // Kill process
+                    kill_process(pid);
+                    
+                    // Free page numbers in main memory and frame numbers in page table
+                    free_frames(main_mem.memory, page_table, pid);
+                    
+                    // Free space in childpids array
+                    childpids[pid] = 0;
                 }
                 else {
-                    // Valid
-                    sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
-                        pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
-                    print_and_write(buffer, fp);
-                    increment_clock(sysclock, request_time);
+                    // Page number is valid
+                    frame_number = get_frame_from_main_memory(main_mem.memory, msg.page);
+                    
+                    if (page_fault(frame_number)) {
+                        // Page fault
+                        sprintf(buffer, "OSS: P%d requested %s access on page %d and page faulted at time %ld:%'ld.\n
+                            Adding process to blocked queue.\n",
+                            pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+                        print_and_write(buffer, fp);
+                        
+                        // Write out time process will be unblocked
+                        time_unblocked[pid] = *sysclock;
+                        increment_clock(&time_unblocked[pid], FIFTEEN_MILLION); // 15ms
+                        
+                        // Add process to blocked queue
+                        enqueue(&blocked, pid);
+                    }
+                    else {
+                        // Page is in frame already
+                        sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
+                            pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+                        print_and_write(buffer, fp);
+                        increment_clock(sysclock, request_time);
+                    }
                 }
             }
             else {
@@ -267,18 +286,22 @@ void terminate_children() {
     printf("OSS: Sending SIGTERM to all children\n");
     fprintf(fp, "OSS: Sending SIGTERM to all children\n");
     int i;
-    for (i = 1; i <= max_running_procs; i++) {
+    for (i = 0; i < max_running_procs; i++) {
         if (childpids[i] == 0) {
             continue;
         }
-        if (kill(childpids[i], SIGTERM) < 0) {
-            if (errno != ESRCH) {
-                // Child process exists and kill failed
-                perror("kill");
-            }
-        }
+        kill_process(i);
     }
     free(childpids);
+}
+
+void kill_process(int pid) {
+    if (kill(childpids[pid], SIGTERM) < 0) {
+        if (errno != ESRCH) {
+            // Child process exists and kill failed
+            perror("kill");
+        }
+    } 
 }
 
 void add_signal_handlers() {
