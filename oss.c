@@ -41,13 +41,13 @@ void print_exit_reason(int proc_cnt);
 int get_request_time(struct message msg);
 bool page_fault(int frame_number);
 
+#define FIFTEEN_MILLION 15000000
+
 // Globals used in signal handler
 int max_running_procs;
 int simulated_clock_id, page_tbl_id, mem_msg_box_id;
 int* page_table;
 struct clock* sysclock;
-struct clock* total_time_blocked;                                 
-struct resource_table* rsc_tbl;
 int cleaning_up = 0;
 pid_t* childpids;
 FILE* fp;
@@ -86,9 +86,9 @@ int main (int argc, char* argv[]) {
     struct MainMemory main_mem = get_main_memory();  // Simulated main memory
     struct MemoryStats stats = get_memory_stats();   // Used to report statistics
     int frame_number, request_time;
-    struct clock time_blocked[max_running_procs];         // Holds clock of time process i was blocked
+    struct clock time_unblocked[max_running_procs];         // Holds clock of time process i was blocked
     for (i = 0; i < max_running_procs; i++) {
-        time_blocked[i] = get_clock();
+        time_unblocked[i] = get_clock();
     }
     struct Queue blocked;
     init_queue(&blocked);
@@ -162,18 +162,18 @@ int main (int argc, char* argv[]) {
             request_time = get_request_time(msg);
 
             if (strcmp(msg.txt, "TERM") != 0) {
-                if (page_number_is_valid(pid, msg.page)) {
-
-                }
-                else {
+                if (!page_number_is_valid(pid, msg.page)) {
                     // seg fault
+                    // so temrinatate/kill process and free frames
                 }
 
                 frame_number = get_frame_from_main_memory(main_mem.memory, msg.page);
+                
                 if (page_fault(frame_number)) {
                     // Page fault
                     // so add process to blocked queue
-                    time_blocked[pid] = *sysclock;
+                    time_unblocked[pid] = *sysclock;
+                    increment_clock(&time_unblocked[pid], FIFTEEN_MILLION);
                     enqueue(&blocked, pid);
                 }
                 else {
