@@ -63,24 +63,48 @@ int get_total_pages(int max_running_procs) {
     return max_running_procs * PROCESS_PAGES;
 }
 
+int get_start_index(int pid) {
+    return pid * PROCESS_PAGES;
+}
+
+int get_end_index(int start_index) {
+    return (start_index + PROCESS_PAGES) - 1;
+}
+
 bool page_number_is_valid(int pid, int page_number) {
     // Returns whether or not page_number is valid given pid
-    int start_index = pid * PROCESS_PAGES;
-    int end_index = (start_index + PROCESS_PAGES) - 1;
+    int start_index = get_start_index(pid);
+    int end_index = get_end_index(start_index);
     if (page_number < start_index || page_number > end_index) {
         return 0;
     }
     return 1;
 }
 
-int get_frame_from_main_memory(struct MainMemory main_mem, int page_number) {
+int get_frame_from_main_memory(int* main_mem, int page_number) {
     // Returns frame number of page if it is in main memory
     int i;
     for (i = 0; i < MAIN_MEMORY_SZE; i++) {
-        if (page_number != main_mem.memory[i]) {
+        if (page_number != main_mem[i]) {
             continue;
         }
         return i;
     }
     return -1;
+}
+
+void free_frames(int* main_mem, int* page_table, int pid) {
+    int start_index = get_start_index(pid);
+    int end_index = get_end_index(start_index);
+    int i, frame_number;
+    for (i = start_index; i < end_index; i++) {
+        if (page_table[i] == 0) {
+            // No entry in page table
+            continue;
+        }
+        frame_number = page_table[i];
+        main_mem[frame_number] = 0;
+        page_table[i] = 0;
+    }
+    return;
 }

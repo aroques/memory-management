@@ -151,20 +151,33 @@ int main (int argc, char* argv[]) {
             receive_msg(mem_msg_box_id, &mem_msg_box, 0);
             msg = parse_msg(mem_msg_box.mtext);
             
+            pid = msg.pid;
             request_time = get_request_time(msg);
 
-            if (strcmp(msg.type, "TERM") != 0) {
-                frame_number = get_frame_from_main_memory(main_mem, msg.page);
+            if (strcmp(msg.txt, "TERM") != 0) {
+                frame_number = get_frame_from_main_memory(main_mem.memory, msg.page);
                 if (frame_number < 0) {
                     // Page fault
                     // so add process to blocked queue
                 }
                 else {
                     // Valid
+                    sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
+                        pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+                    print_and_write(buffer, fp);
+                    increment_clock(sysclock, request_time);
                 }
             }
             else {
-                // process terminated
+                // Process terminated
+                sprintf(buffer, "OSS: Acknowledging P%d terminated at time %ld:%'ld\n",
+                    pid, sysclock->seconds, sysclock->nanoseconds);
+                print_and_write(buffer, fp);
+                // Free page numbers in main memory and frame numbers in page table
+                free_frames(main_mem.memory, page_table, pid);
+                
+                // Free space in childpids array
+                childpids[pid] = 0;
             }
 
             sprintf(buffer, "\n");
@@ -382,10 +395,10 @@ void print_exit_reason(int proc_cnt) {
 }
 
 int get_request_time(struct message msg) {
-    if (strcmp(msg.type, "READ") == 0) {
+    if (strcmp(msg.txt, "READ") == 0) {
         return 10; // nanoseconds
     }
-    else if (strcmp(msg.type, "WRITE") == 0) {
+    else if (strcmp(msg.txt, "WRITE") == 0) {
         return 20; // nanseconds
     }
     return 0;
