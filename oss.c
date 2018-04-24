@@ -39,6 +39,7 @@ void open_file_for_writing(char* filename);
 struct MainMemory get_main_memory();
 void print_exit_reason(int proc_cnt);
 int get_request_time(struct message msg);
+bool page_fault(int frame_number);
 
 // Globals used in signal handler
 int max_running_procs;
@@ -77,7 +78,7 @@ int main (int argc, char* argv[]) {
     /*
      *  Declare variables used in main loop
      */
-    int /*i,*/ pid = 0, num_messages;                        // Used in various scopes throughout main loop
+    int i, pid = 0, num_messages;                        // Used in various scopes throughout main loop
     char buffer[255];                                // Used to hold output that will be printed and written to log file
     int proc_cnt = 0;                                // Holds total number of active child processes
     struct clock time_to_fork = get_clock();         // Holds time to schedule new process
@@ -85,6 +86,12 @@ int main (int argc, char* argv[]) {
     struct MainMemory main_mem = get_main_memory();  // Simulated main memory
     struct MemoryStats stats = get_memory_stats();   // Used to report statistics
     int frame_number, request_time;
+    struct clock time_blocked[max_running_procs];         // Holds clock of time process i was blocked
+    for (i = 0; i < max_running_procs; i++) {
+        time_blocked[i] = get_clock();
+    }
+    struct Queue blocked;
+    init_queue(&blocked);
 
     // Setup execv array to pass initial data to children processes
     char* execv_arr[EXECV_SIZE];                
@@ -155,10 +162,19 @@ int main (int argc, char* argv[]) {
             request_time = get_request_time(msg);
 
             if (strcmp(msg.txt, "TERM") != 0) {
+                if (page_number_is_valid(pid, msg.page)) {
+
+                }
+                else {
+                    // seg fault
+                }
+
                 frame_number = get_frame_from_main_memory(main_mem.memory, msg.page);
-                if (frame_number < 0) {
+                if (page_fault(frame_number)) {
                     // Page fault
                     // so add process to blocked queue
+                    time_blocked[pid] = *sysclock;
+                    enqueue(&blocked, pid);
                 }
                 else {
                     // Valid
@@ -400,6 +416,13 @@ int get_request_time(struct message msg) {
     }
     else if (strcmp(msg.txt, "WRITE") == 0) {
         return 20; // nanseconds
+    }
+    return 0;
+}
+
+bool page_fault(int frame_number) {
+    if (frame_number < 0) {
+        return 1;
     }
     return 0;
 }
