@@ -33,5 +33,7 @@ int get_frame_from_main_memory(int* main_mem, int page_number);
 int get_start_index(int pid);
 int get_end_index(int start_index);
 void free_frames(int* main_mem, int* page_table, int pid);
+int get_free_frame_number(int* main_mem);
+bool main_memory_is_full(int free_frame_number);
 
 #endif

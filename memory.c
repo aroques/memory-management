@@ -111,11 +111,30 @@ void free_frames(int* main_mem, int* page_table, int pid) {
 
 void add_page_to_main_memory(int* main_mem, int page_number) {
     int i;
+    int free_frame_number = get_free_frame_number(main_mem);
+
+    if (main_memory_is_full(free_frame_number)) {
+        // Page swap
+    }
+    else {
+        // Just put page in main memory
+    }
+}
+
+int get_free_frame_number(int* main_mem) {
+    int i;
     for (i = 0; i < MAIN_MEMORY_SZE; i++) {
         if (main_mem[i] != 0) {
             continue;
         }
-        // Frame is free
-        main_mem[i] = page_number;
+        return i;
     }
+    return -1; // No free frame
+}
+
+bool main_memory_is_full(int free_frame_number) {
+    if (free_frame_number < 0) {
+        return 1;
+    }
+    return 0;
 }

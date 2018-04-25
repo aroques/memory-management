@@ -41,7 +41,8 @@ void print_exit_reason(int proc_cnt);
 int get_request_time(struct message msg);
 bool page_fault(int frame_number);
 void kill_process(int pid);
-bool is_unblocked(int pid, struct clock* time_unblocked);
+bool is_unblocked(int pid, struct clock time_unblocked);
+struct BlockedInfo get_blocked_info();
 
 #define FIFTEEN_MILLION 15000000
 
@@ -99,6 +100,7 @@ int main (int argc, char* argv[]) {
         page_number = 0;
     }
     struct BlockedInfo blkd_info;
+    struct clock unblocked_time;
     struct Queue blocked;
     init_queue(&blocked);
 
@@ -158,13 +160,18 @@ int main (int argc, char* argv[]) {
 
         // Check blocked queue
         pid = peek(&blocked);
-        if (is_unblocked(pid, time_unblocked)) {
+
+        // Get blocked info struct from array
+        blkd_info = blocked_info[pid];
+        unblocked_time = blkd_info.time_unblocked;
+        
+        if (is_unblocked(pid, unblocked_time)) {
+
+            page_number = blkd_info.page_number;
+
             sprintf(buffer, "OSS: P%d requested %s access on page %d and page faulted at time %ld:%'ld.\n     Adding process to blocked queue.\n",
                 pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
             print_and_write(buffer, fp);
-            // 
-            blkd_info = blocked_info[pid];
-            page_number = blkd_info.page_number;
 
             // Add page to main memory
             // need to check if main memory is full and if it is then run a page swap algorithm
@@ -172,6 +179,8 @@ int main (int argc, char* argv[]) {
 
             // Remove from blocked queue
             dequeue(&blocked);
+
+            // Send message
 
         }
 
@@ -214,9 +223,12 @@ int main (int argc, char* argv[]) {
                             pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
                         print_and_write(buffer, fp);
                         
+                        blkd_info = get_blocked_info();
+
                         // Store blocked information
                         blkd_info.page_number = msg.page;
                         sprintf(blkd_info.type_of_request, msg.txt);
+                        
                         // Write out time process will be unblocked
                         blkd_info.time_unblocked = *sysclock;
                         increment_clock(&blkd_info.time_unblocked, FIFTEEN_MILLION); // 15ms
@@ -484,12 +496,18 @@ bool page_fault(int frame_number) {
     return 0;
 }
 
-bool is_unblocked(int pid, struct clock* time_unblocked) {
-    // rework for new blocked info struct
-    struct clock unblocked_time = time_unblocked[pid];
-
-    if (compare_clocks(*sysclock, unblocked_time) >=  0) {
+bool is_unblocked(int pid, struct clock time_unblocked) {
+    if (compare_clocks(*sysclock, time_unblocked) >=  0) {
         return 1;
     }
     return 0;
+}
+
+struct BlockedInfo get_blocked_info() {
+    struct BlockedInfo binfo = {
+        .page_number = 0,
+        .time_unblocked = get_clock(),
+        .type_of_request = ""
+    };
+    return binfo;
 }
