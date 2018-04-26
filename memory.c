@@ -170,3 +170,10 @@ void add_frame_to_page_table(int frame_number, int* page_table, int pid) {
         page_table[i] = frame_number;
     }
 }
+
+void print_main_memory(struct MainMemory main_mem) {
+    int i;
+    for (i = 0; i < MAIN_MEMORY_SZE; i++) {
+        
+    }
+}

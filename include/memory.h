@@ -39,5 +39,6 @@ int get_free_frame_number(int* main_mem);
 bool main_memory_is_full(int free_frame_number);
 int second_chance_page_replacement(struct MainMemory* main_mem);
 void add_frame_to_page_table(int frame_number, int* page_table, int pid);
+void print_main_memory(struct MainMemory main_mem);
 
 #endif
