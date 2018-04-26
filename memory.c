@@ -10,7 +10,7 @@ struct MainMemory get_main_memory() {
     int i;
     for (i = 0; i < MAIN_MEMORY_SZE; i++) {
         main_mem.memory[i] = 0;
-        main_mem.allocated[i] = 0;
+        main_mem.second_chance[i] = 0;
         main_mem.dirty[i] = 0;
     }
     return main_mem;
@@ -94,7 +94,7 @@ int get_frame_from_main_memory(int* main_mem, int page_number) {
     return -1;
 }
 
-void free_frames(struct MainMemory main_mem, int* page_table, int pid) {
+void free_frames(struct MainMemory* main_mem, int* page_table, int pid) {
     int start_index = get_start_index(pid);
     int end_index = get_end_index(start_index);
     int i, frame_number;
@@ -104,8 +104,9 @@ void free_frames(struct MainMemory main_mem, int* page_table, int pid) {
             continue;
         }
         frame_number = page_table[i];
-        main_mem.memory[frame_number] = 0;
-        main_mem.dirty[frame_number] = 0;
+        main_mem->memory[frame_number] = 0;
+        main_mem->dirty[frame_number] = 0;
+        main_mem->second_chance[frame_number] = 0;
         page_table[i] = 0;
     }
     return;
@@ -129,8 +130,32 @@ bool main_memory_is_full(int free_frame_number) {
     return 0;
 }
 
-int get_frame_number_to_swap() {
-    return rand() % MAIN_MEMORY_SZE;
+int second_chance_page_replacement(struct MainMemory* main_mem) {
+    // This function is assumes main memory is full (i.e., there is a page stored in every frame)
+    int i, frame_number = -1;
+    
+    i = main_mem->second_chance_ptr;
+    
+    while (frame_number < 0) {
+        // Reset index so that if at end then we just restart at the beginning
+        if (i == MAIN_MEMORY_SZE) {
+            i = 0;
+        }
+        
+        if (main_mem->second_chance[i]) {
+            // This frames second chance bit is set, so give it a second chance
+            main_mem->second_chance[i] = 0;
+        }
+        else {
+            frame_number = i;
+        }
+
+        i++;
+    }
+
+    main_mem->second_chance_ptr = i;
+
+    return frame_number; 
 }
 
 void add_frame_to_page_table(int frame_number, int* page_table, int pid) {

@@ -11,8 +11,9 @@
 
 struct MainMemory {
     int memory[MAIN_MEMORY_SZE];
-    bool allocated[MAIN_MEMORY_SZE];
+    bool second_chance[MAIN_MEMORY_SZE];
     bool dirty[MAIN_MEMORY_SZE];
+    int second_chance_ptr;
 };
 
 struct MemoryStats {
@@ -33,10 +34,10 @@ bool page_number_is_valid(int pid, int page_number);
 int get_frame_from_main_memory(int* main_mem, int page_number);
 int get_start_index(int pid);
 int get_end_index(int start_index);
-void free_frames(int* main_mem, int* page_table, int pid);
+void free_frames(struct MainMemory* main_mem, int* page_table, int pid);
 int get_free_frame_number(int* main_mem);
 bool main_memory_is_full(int free_frame_number);
-int get_frame_number_to_swap();
+int second_chance_page_replacement(struct MainMemory* main_mem);
 void add_frame_to_page_table(int frame_number, int* page_table, int pid);
 
 #endif

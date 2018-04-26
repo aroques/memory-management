@@ -42,7 +42,7 @@ bool page_fault(int frame_number);
 void kill_process(int pid);
 bool is_unblocked(int pid, struct clock time_unblocked);
 struct BlockedInfo get_blocked_info();
-int add_page_to_main_memory(int* main_mem, int page_number);
+int add_page_to_main_memory(struct MainMemory* main_mem, int page_number);
 
 #define FIFTEEN_MILLION 15000000
 
@@ -181,10 +181,13 @@ int main (int argc, char* argv[]) {
                 print_and_write(buffer, fp);
 
                 // Add page to main memory
-                frame_number = add_page_to_main_memory(main_mem.memory, page_number);
+                frame_number = add_page_to_main_memory(&main_mem, page_number);
 
                 // Add frame number to page table
                 add_frame_to_page_table(frame_number, page_table, pid);
+
+                // Set second chance bit
+                main_mem.second_chance[frame_number] = 1;    
 
                 // Mark frame as dirty if write
                 if (strcmp(blkd_info.type_of_request, "WRITE") == 0) {
@@ -238,7 +241,7 @@ int main (int argc, char* argv[]) {
                     kill_process(pid);
 
                     // Free page numbers in main memory and frame numbers in page table
-                    free_frames(main_mem.memory, page_table, pid);
+                    free_frames(&main_mem, page_table, pid);
 
                     // Free space in childpids array
                     childpids[pid] = 0;
@@ -285,7 +288,10 @@ int main (int argc, char* argv[]) {
                         // Increment clock and update stats
                         increment_clock(sysclock, request_time);
                         stats.total_mem_access_time += request_time;
-                        
+
+                        // Set second chance bit
+                        main_mem.second_chance[frame_number] = 1;    
+
                         // Mark frame as dirty if write
                         if (strcmp(msg.txt, "WRITE") == 0) {
                             main_mem.dirty[frame_number] = 1;
@@ -306,7 +312,7 @@ int main (int argc, char* argv[]) {
                 print_and_write(buffer, fp);
                 
                 // Free page numbers in main memory and frame numbers in page table
-                free_frames(main_mem.memory, page_table, pid);
+                free_frames(&main_mem, page_table, pid);
                 
                 // Free space in childpids array
                 childpids[pid] = 0;
@@ -563,16 +569,16 @@ struct BlockedInfo get_blocked_info() {
     return binfo;
 }
 
-int add_page_to_main_memory(int* main_mem, int page_number) {
+int add_page_to_main_memory(struct MainMemory* main_mem, int page_number) {
     char buffer[256];
-    int free_frame_number = get_free_frame_number(main_mem);
+    int free_frame_number = get_free_frame_number(main_mem->memory);
 
     if (main_memory_is_full(free_frame_number)) {
         // Page swap
-        free_frame_number = get_frame_number_to_swap();
+        free_frame_number = second_chance_page_replacement(main_mem);
 
         sprintf(buffer, "     Main memory is full so swapping page %d in frame %d with page %d\n\n",
-            main_mem[free_frame_number], free_frame_number, page_number);
+            main_mem->memory[free_frame_number], free_frame_number, page_number);
         print_and_write(buffer, fp);
 
     }
@@ -583,7 +589,7 @@ int add_page_to_main_memory(int* main_mem, int page_number) {
         print_and_write(buffer, fp);
     }
     
-    main_mem[free_frame_number] = page_number;
+    main_mem->memory[free_frame_number] = page_number;
 
     return free_frame_number;
 }
