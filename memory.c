@@ -48,12 +48,12 @@ void print_statistics(FILE* fp, struct MemoryStats stats) {
 
     // Print
     sprintf(buffer, "Statistics\n");
-    sprintf(buffer + strlen(buffer), "  %-23s: %'d\n", "Memory Accesses", stats.num_memory_accesses);
-    sprintf(buffer + strlen(buffer), "  %-23s: %.2f\n", "Memory Accesses/Millisecond", mem_access_per_ms);
-    sprintf(buffer + strlen(buffer), "  %-23s: %.2f\n", "Page Faults/Memory Access", page_fault_per_access);
-    sprintf(buffer + strlen(buffer), "  %-23s: %.2f ms\n", "Avg Memory Access Speed", avg_mem_access_speed); 
-    sprintf(buffer + strlen(buffer), "  %-23s: %'d\n", "Segmentation Faults", stats.num_seg_faults);
-    sprintf(buffer + strlen(buffer), "  %-23s: %.2f processes/sec\n", "Throughput", throughput);
+    sprintf(buffer + strlen(buffer), "  %-28s: %'d\n", "Memory Accesses", stats.num_memory_accesses);
+    sprintf(buffer + strlen(buffer), "  %-28s: %.2f\n", "Memory Accesses/Millisecond", mem_access_per_ms);
+    sprintf(buffer + strlen(buffer), "  %-28s: %.2f\n", "Page Faults/Memory Access", page_fault_per_access);
+    sprintf(buffer + strlen(buffer), "  %-28s: %.2f ms\n", "Avg Memory Access Speed", avg_mem_access_speed); 
+    sprintf(buffer + strlen(buffer), "  %-28s: %'d\n", "Segmentation Faults", stats.num_seg_faults);
+    sprintf(buffer + strlen(buffer), "  %-28s: %.2f processes/sec\n", "Throughput", throughput);
     sprintf(buffer + strlen(buffer), "\n");
     
     print_and_write(buffer, fp);

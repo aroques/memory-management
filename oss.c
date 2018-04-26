@@ -48,7 +48,7 @@ int add_page_to_main_memory(int* main_mem, int page_number);
 
 // Globals used in signal handler
 int max_running_procs;
-int simulated_clock_id, page_tbl_id, mem_msg_box_id;
+int simulated_clock_id, page_tbl_id, mem_msg_box_id, out_msg_box_id;
 int* page_table;
 struct clock* sysclock;
 int cleaning_up = 0;
@@ -81,7 +81,7 @@ int main (int argc, char* argv[]) {
 
     // Get command line arg
     max_running_procs = parse_cmd_line_args(argc, argv);
-    unsigned int elapsed_seconds = 0;           // Holds total real seconds the program has run
+    int elapsed_seconds = 0;           // Holds total real seconds the program has run
 
     /*
      *  Declare variables used in main loop
@@ -126,6 +126,10 @@ int main (int argc, char* argv[]) {
     // Shared message box for user processes to request read/write memory 
     mem_msg_box_id = get_message_queue();
     struct msgbuf mem_msg_box;
+
+    out_msg_box_id = get_message_queue();
+    struct msgbuf out_msg_box;
+    
     struct message msg;
     
     // Initialize childpid array
@@ -143,7 +147,7 @@ int main (int argc, char* argv[]) {
     /*
      *  Main loop
      */
-    while ( elapsed_seconds < TOTAL_RUNTIME || proc_cnt < 100) {
+    while ( elapsed_seconds < TOTAL_RUNTIME && proc_cnt < 100) {
         // Check if it is time to fork a new user process
         if (compare_clocks(*sysclock, time_to_fork) >= 0 && proc_cnt < max_running_procs) {
             // Fork a new process
@@ -176,17 +180,16 @@ int main (int argc, char* argv[]) {
                 print_and_write(buffer, fp);
 
                 // Add page to main memory
-                // need to check if main memory is full and if it is then run a page swap algorithm
                 frame_number = add_page_to_main_memory(main_mem.memory, page_number);
 
-                // add frame number to page table
+                // Add frame number to page table
                 add_frame_to_page_table(frame_number, page_table, pid);
 
                 // Remove from blocked queue
                 dequeue(&blocked);
 
                 // Send message
-                send_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
+                send_msg(out_msg_box_id, &out_msg_box, pid);
             }
 
             // Check if all processes are blocked
@@ -206,7 +209,6 @@ int main (int argc, char* argv[]) {
         msgctl(mem_msg_box_id, IPC_STAT, &msgq_ds);
         num_messages = msgq_ds.msg_qnum;
 
-        // Check for any messages
         if (num_messages > 0) {
             receive_msg(mem_msg_box_id, &mem_msg_box, 0);
             msg = parse_msg(mem_msg_box.mtext);
@@ -224,12 +226,13 @@ int main (int argc, char* argv[]) {
                     
                     // Kill process
                     kill_process(pid);
-                    
+
                     // Free page numbers in main memory and frame numbers in page table
                     free_frames(main_mem.memory, page_table, pid);
-                    
+
                     // Free space in childpids array
                     childpids[pid] = 0;
+                    proc_cnt--;
                 }
                 else {
                     // Page number is valid
@@ -266,7 +269,7 @@ int main (int argc, char* argv[]) {
                         increment_clock(sysclock, request_time);
 
                         // Send message
-                        send_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
+                        send_msg(out_msg_box_id, &out_msg_box, pid);
                     }
                 }
             }
@@ -281,6 +284,7 @@ int main (int argc, char* argv[]) {
                 
                 // Free space in childpids array
                 childpids[pid] = 0;
+                proc_cnt--;
             }
         }
 
@@ -305,16 +309,19 @@ void fork_child(char** execv_arr, unsigned int pid) {
         char clock_id[10];
         char pg_tbl_id[10];
         char msgbox_id[10];
+        char out_msgbox_id[10];
         char p_id[5];
         
         sprintf(clock_id, "%d", simulated_clock_id);
         sprintf(pg_tbl_id, "%d", page_tbl_id);
         sprintf(msgbox_id, "%d", mem_msg_box_id);
+        sprintf(out_msgbox_id, "%d", out_msg_box_id);
         sprintf(p_id, "%d", pid);
         
         execv_arr[SYSCLOCK_ID_IDX] = clock_id;
         execv_arr[PAGE_TBL_ID_IDX] = pg_tbl_id;
         execv_arr[MEM_MSGBX_ID_IDX] = msgbox_id;
+        execv_arr[OUT_MSGBX_ID_IDX] = out_msgbox_id;
         execv_arr[PID_IDX] = p_id;
 
         execvp(execv_arr[0], execv_arr);
@@ -422,7 +429,7 @@ struct clock get_time_to_fork_new_proc(struct clock sysclock) {
 }
 
 unsigned int get_nanoseconds() {
-    return (rand() % 800000) + 10000; // 10,000 - 800,000 inclusive
+    return (rand() % 1000) + 250; // 500 - 5,000 inclusive
 }
 
 int get_available_pid() {

@@ -41,6 +41,7 @@ int main (int argc, char *argv[]) {
     int sysclock_id = atoi(argv[SYSCLOCK_ID_IDX]);
     int page_tbl_id = atoi(argv[PAGE_TBL_ID_IDX]);
     int mem_msg_box_id = atoi(argv[MEM_MSGBX_ID_IDX]);
+    int out_msg_box_id = atoi(argv[OUT_MSGBX_ID_IDX]);
     int pid = atoi(argv[PID_IDX]);
 
     // Attach to shared memory
@@ -52,7 +53,7 @@ int main (int argc, char *argv[]) {
     int references_before_terminating = get_num_mem_references();
     int num_requests = 0;
     int page_number;
-    struct msgbuf mem_msg_box;
+    struct msgbuf mem_msg_box, out_msg_box;
     char reference_type[6];
 
     while (1) {
@@ -68,7 +69,7 @@ int main (int argc, char *argv[]) {
         send_msg(mem_msg_box_id, &mem_msg_box, pid);
         
         // Blocking Receive - wait until OSS grants request
-        receive_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
+        receive_msg(out_msg_box_id, &out_msg_box, pid);
         
         if (num_requests == references_before_terminating) {
             // Check to see if process will terminate
