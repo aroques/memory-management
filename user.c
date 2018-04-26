@@ -28,8 +28,8 @@ int get_num_mem_references();
 
 void get_reference_type(char* reference_type);
 
-const unsigned int CHANCE_TERMINATE = 5;
-const unsigned int CHANCE_SEG_FAULT = 1;
+const unsigned int CHANCE_TERMINATE = 50;
+const unsigned int CHANCE_SEG_FAULT = 4;
 const unsigned int CHANCE_READ = 70;
 
 int main (int argc, char *argv[]) {

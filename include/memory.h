@@ -7,6 +7,7 @@
 
 #define MAIN_MEMORY_SZE 256
 #define PROCESS_PAGES 32
+#define ONE_MILLION 1000000
 
 struct MainMemory {
     int memory[MAIN_MEMORY_SZE];
@@ -20,7 +21,7 @@ struct MemoryStats {
     int num_seg_faults;
     int proc_cnt;
     long double num_seconds;
-    unsigned int total_mem_access_time;
+    unsigned long total_mem_access_time;
 };
 
 struct MainMemory get_main_memory();

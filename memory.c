@@ -44,6 +44,7 @@ void print_statistics(FILE* fp, struct MemoryStats stats) {
     float mem_access_per_ms = stats.num_memory_accesses / (stats.num_seconds * 1000);
     float page_fault_per_access = stats.num_page_faults / (float) stats.num_memory_accesses;
     float avg_mem_access_speed = stats.total_mem_access_time / (float) stats.num_memory_accesses;
+    avg_mem_access_speed /= ONE_MILLION; // Convert from nanoseconds to milliseconds
     float throughput = stats.proc_cnt / stats.num_seconds;
 
     // Print
@@ -51,7 +52,7 @@ void print_statistics(FILE* fp, struct MemoryStats stats) {
     sprintf(buffer + strlen(buffer), "  %-28s: %'d\n", "Memory Accesses", stats.num_memory_accesses);
     sprintf(buffer + strlen(buffer), "  %-28s: %.2f\n", "Memory Accesses/Millisecond", mem_access_per_ms);
     sprintf(buffer + strlen(buffer), "  %-28s: %.2f\n", "Page Faults/Memory Access", page_fault_per_access);
-    sprintf(buffer + strlen(buffer), "  %-28s: %.2f ms\n", "Avg Memory Access Speed", avg_mem_access_speed); 
+    sprintf(buffer + strlen(buffer), "  %-28s: %'.2f ms\n", "Avg Memory Access Speed", avg_mem_access_speed); 
     sprintf(buffer + strlen(buffer), "  %-28s: %'d\n", "Segmentation Faults", stats.num_seg_faults);
     sprintf(buffer + strlen(buffer), "  %-28s: %.2f processes/sec\n", "Throughput", throughput);
     sprintf(buffer + strlen(buffer), "\n");

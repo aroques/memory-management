@@ -37,7 +37,7 @@ void init_childpid_array();
 void open_file_for_writing(char* filename);
 struct MainMemory get_main_memory();
 void print_exit_reason(int proc_cnt);
-int get_request_time(struct message msg);
+int get_request_time(char* request_type);
 bool page_fault(int frame_number);
 void kill_process(int pid);
 bool is_unblocked(int pid, struct clock time_unblocked);
@@ -86,9 +86,9 @@ int main (int argc, char* argv[]) {
     /*
      *  Declare variables used in main loop
      */
-    int i, pid = 0, num_messages;                        // Used in various scopes throughout main loop
+    int i, pid = 0, num_messages;                     // Used in various scopes throughout main loop
     char buffer[255];                                // Used to hold output that will be printed and written to log file
-    int proc_cnt = 0;                                // Holds total number of active child processes
+    int proc_cnt = 0, total_procs = 0;                   
     struct clock time_to_fork = get_clock();         // Holds time to schedule new process
     struct msqid_ds msgq_ds;                         // Used to check number of messages in msg box
     struct MainMemory main_mem = get_main_memory();  // Simulated main memory
@@ -155,6 +155,7 @@ int main (int argc, char* argv[]) {
             
             fork_child(execv_arr, pid);
             proc_cnt++;
+            total_procs++;
             
             sprintf(buffer, "OSS: Generating P%d at time %ld:%'ld\n",
                 pid, sysclock->seconds, sysclock->nanoseconds);
@@ -176,7 +177,7 @@ int main (int argc, char* argv[]) {
                 page_number = blkd_info.page_number;
 
                 sprintf(buffer, "\nOSS: 15ms have passed. Unblocking P%d and granting %s access on page %d at time %ld:%'ld.\n",
-                    pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+                    pid, blkd_info.type_of_request, page_number, sysclock->seconds, sysclock->nanoseconds);
                 print_and_write(buffer, fp);
 
                 // Add page to main memory
@@ -190,6 +191,8 @@ int main (int argc, char* argv[]) {
 
                 // Send message
                 send_msg(out_msg_box_id, &out_msg_box, pid);
+
+                stats.num_memory_accesses++;
             }
 
             // Check if all processes are blocked
@@ -209,12 +212,12 @@ int main (int argc, char* argv[]) {
         msgctl(mem_msg_box_id, IPC_STAT, &msgq_ds);
         num_messages = msgq_ds.msg_qnum;
 
-        if (num_messages > 0) {
+        while (num_messages-- > 0) {
             receive_msg(mem_msg_box_id, &mem_msg_box, 0);
             msg = parse_msg(mem_msg_box.mtext);
             
             pid = msg.pid;
-            request_time = get_request_time(msg);
+            request_time = get_request_time(msg.txt);
 
             if (strcmp(msg.txt, "TERM") != 0) {
                 // Process is requesting memory to be read from or written to
@@ -233,6 +236,8 @@ int main (int argc, char* argv[]) {
                     // Free space in childpids array
                     childpids[pid] = 0;
                     proc_cnt--;
+
+                    stats.num_seg_faults++;
                 }
                 else {
                     // Page number is valid
@@ -253,12 +258,16 @@ int main (int argc, char* argv[]) {
                         // Write out time process will be unblocked
                         blkd_info.time_unblocked = *sysclock;
                         increment_clock(&blkd_info.time_unblocked, FIFTEEN_MILLION); // 15ms
+
+                        stats.total_mem_access_time += FIFTEEN_MILLION;
                         
                         // Store blocked information in array
                         blocked_info[pid] = blkd_info;
 
                         // Add process to blocked queue
                         enqueue(&blocked, pid);
+
+                        stats.num_page_faults++;
                     }
                     else {
                         // Page is in frame already
@@ -267,9 +276,12 @@ int main (int argc, char* argv[]) {
                         print_and_write(buffer, fp);
                         
                         increment_clock(sysclock, request_time);
+                        stats.total_mem_access_time += request_time;
 
                         // Send message
                         send_msg(out_msg_box_id, &out_msg_box, pid);
+
+                        stats.num_memory_accesses++;
                     }
                 }
             }
@@ -296,6 +308,10 @@ int main (int argc, char* argv[]) {
     }
 
     print_exit_reason(proc_cnt);
+
+    stats.num_seconds = clock_to_seconds(*sysclock);
+    stats.proc_cnt = total_procs;
+
     print_statistics(fp, stats);
 
     cleanup_and_exit();
@@ -498,11 +514,11 @@ void print_exit_reason(int proc_cnt) {
     print_and_write(buffer, fp);
 }
 
-int get_request_time(struct message msg) {
-    if (strcmp(msg.txt, "READ") == 0) {
+int get_request_time(char* request_type) {
+    if (strcmp(request_type, "READ") == 0) {
         return 10; // nanoseconds
     }
-    else if (strcmp(msg.txt, "WRITE") == 0) {
+    else if (strcmp(request_type, "WRITE") == 0) {
         return 20; // nanseconds
     }
     return 0;
