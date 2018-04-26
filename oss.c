@@ -31,7 +31,6 @@ struct clock get_time_to_fork_new_proc(struct clock sysclock);
 unsigned int get_nanoseconds();
 int get_available_pid();
 struct message parse_msg(char* mtext);
-unsigned int get_work();
 void print_blocked_queue();
 float percent(int numerator, int denominator);
 void init_childpid_array();
@@ -102,6 +101,7 @@ int main (int argc, char* argv[]) {
     }
     struct BlockedInfo blkd_info;
     struct clock unblocked_time;
+    struct clock difference;
     struct Queue blocked;
     init_queue(&blocked);
 
@@ -171,7 +171,7 @@ int main (int argc, char* argv[]) {
                 // If process is unblocked
                 page_number = blkd_info.page_number;
 
-                sprintf(buffer, "OSS: 15ms have passed. Unblocking P%d and granting %s access on page %d at time %ld:%'ld.\n",
+                sprintf(buffer, "\nOSS: 15ms have passed. Unblocking P%d and granting %s access on page %d at time %ld:%'ld.\n",
                     pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
                 print_and_write(buffer, fp);
 
@@ -187,8 +187,17 @@ int main (int argc, char* argv[]) {
 
                 // Send message
                 send_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
+            }
 
-                sprintf(buffer, "\n");
+            // Check if all processes are blocked
+            if (count(&blocked) == max_running_procs) {
+                
+                difference = subtract_clocks(unblocked_time, *sysclock);
+                
+                *sysclock = unblocked_time;
+                
+                sprintf(buffer, "\nOSS: All processes blocked because of page faults. Incrementing clock %ld:%'ld to unblock 1 process at time %ld:%'ld.\n\n",
+                    difference.seconds, difference.nanoseconds, sysclock->seconds, sysclock->nanoseconds);
                 print_and_write(buffer, fp);
             }
         }
@@ -198,7 +207,7 @@ int main (int argc, char* argv[]) {
         num_messages = msgq_ds.msg_qnum;
 
         // Check for any messages
-        while (num_messages-- > 0) {
+        if (num_messages > 0) {
             receive_msg(mem_msg_box_id, &mem_msg_box, 0);
             msg = parse_msg(mem_msg_box.mtext);
             
@@ -209,7 +218,7 @@ int main (int argc, char* argv[]) {
                 // Process is requesting memory to be read from or written to
                 if (!page_number_is_valid(pid, msg.page)) {
                     // Seg Fault
-                    sprintf(buffer, "OSS: P%d seg faulted and will be terminated at time %ld:%'ld.\n",
+                    sprintf(buffer, "\nOSS: P%d seg faulted and will be terminated at time %ld:%'ld.\n\n",
                         pid, sysclock->seconds, sysclock->nanoseconds);
                     print_and_write(buffer, fp);
                     
@@ -253,13 +262,17 @@ int main (int argc, char* argv[]) {
                         sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
                             pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
                         print_and_write(buffer, fp);
+                        
                         increment_clock(sysclock, request_time);
+
+                        // Send message
+                        send_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
                     }
                 }
             }
             else {
                 // Process terminated
-                sprintf(buffer, "OSS: Acknowledging P%d terminated at time %ld:%'ld\n",
+                sprintf(buffer, "\nOSS: Acknowledging P%d terminated at time %ld:%'ld\n\n",
                     pid, sysclock->seconds, sysclock->nanoseconds);
                 print_and_write(buffer, fp);
                 
@@ -269,12 +282,6 @@ int main (int argc, char* argv[]) {
                 // Free space in childpids array
                 childpids[pid] = 0;
             }
-
-            sprintf(buffer, "\n");
-            print_and_write(buffer, fp);
-
-            // Increment clock slightly whenever a resource is granted or released
-            increment_clock(sysclock, get_work());
         }
 
         increment_clock(sysclock, get_nanoseconds());
@@ -418,10 +425,6 @@ unsigned int get_nanoseconds() {
     return (rand() % 800000) + 10000; // 10,000 - 800,000 inclusive
 }
 
-unsigned int get_work() {
-    return (rand() % 100000) + 10000; // 10,000 - 100,000 inclusive
-}
-
 int get_available_pid() {
     int pid, i;
     for (i = 0; i < max_running_procs; i++) {
@@ -529,14 +532,14 @@ int add_page_to_main_memory(int* main_mem, int page_number) {
         // Page swap
         free_frame_number = get_frame_number_to_swap();
 
-        sprintf(buffer, "     Main memory is full so swapping page %d in frame %d with page %d\n",
+        sprintf(buffer, "     Main memory is full so swapping page %d in frame %d with page %d\n\n",
             main_mem[free_frame_number], free_frame_number, page_number);
         print_and_write(buffer, fp);
 
     }
     else {
         // Just put page in main memory
-        sprintf(buffer, "     Main memory is not full so putting page %d in frame %d\n",
+        sprintf(buffer, "     Main memory is not full so putting page %d in frame %d\n\n",
             page_number, free_frame_number);
         print_and_write(buffer, fp);
     }

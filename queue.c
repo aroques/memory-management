@@ -14,6 +14,10 @@ void init_queue(struct Queue *q) {
     q->count = 0;
 }
 
+int count(struct Queue *q) {
+    return q->count;
+}
+
 void enqueue(struct Queue *q, int x) {
     if (q->count >= QUEUESIZE)
     printf("Warning: queue overflow enqueue x=%d\n",x);
