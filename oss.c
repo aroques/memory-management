@@ -43,6 +43,7 @@ bool page_fault(int frame_number);
 void kill_process(int pid);
 bool is_unblocked(int pid, struct clock time_unblocked);
 struct BlockedInfo get_blocked_info();
+int add_page_to_main_memory(int* main_mem, int page_number);
 
 #define FIFTEEN_MILLION 15000000
 
@@ -64,8 +65,8 @@ struct message {
 struct BlockedInfo {
     int page_number;
     struct clock time_unblocked;
-    char* type_of_request[6];
-}
+    char type_of_request[6];
+};
 
 int main (int argc, char* argv[]) {
     const unsigned int TOTAL_RUNTIME = 2;       // Max seconds oss should run for
@@ -96,8 +97,8 @@ int main (int argc, char* argv[]) {
     int frame_number, request_time, page_number;
     struct BlockedInfo blocked_info[max_running_procs];
     for (i = 0; i < max_running_procs; i++) {
-        blocked_info.time_unblocked[i] = get_clock();
-        page_number = 0;
+        blocked_info[i].time_unblocked = get_clock();
+        blocked_info[i].page_number = 0;
     }
     struct BlockedInfo blkd_info;
     struct clock unblocked_time;
@@ -158,32 +159,40 @@ int main (int argc, char* argv[]) {
             time_to_fork = get_time_to_fork_new_proc(*sysclock);
         }
 
-        // Check blocked queue
-        pid = peek(&blocked);
+        if (!empty(&blocked)) {
+            // Check blocked queue
+            pid = peek(&blocked);
 
-        // Get blocked info struct from array
-        blkd_info = blocked_info[pid];
-        unblocked_time = blkd_info.time_unblocked;
-        
-        if (is_unblocked(pid, unblocked_time)) {
+            // Get blocked info struct from array
+            blkd_info = blocked_info[pid];
+            unblocked_time = blkd_info.time_unblocked;
 
-            page_number = blkd_info.page_number;
+            if (is_unblocked(pid, unblocked_time)) {
+                // If process is unblocked
+                page_number = blkd_info.page_number;
 
-            sprintf(buffer, "OSS: P%d requested %s access on page %d and page faulted at time %ld:%'ld.\n     Adding process to blocked queue.\n",
-                pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
-            print_and_write(buffer, fp);
+                sprintf(buffer, "OSS: 15ms have passed. Unblocking P%d and granting %s access on page %d at time %ld:%'ld.\n",
+                    pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+                print_and_write(buffer, fp);
 
-            // Add page to main memory
-            // need to check if main memory is full and if it is then run a page swap algorithm
-            add_page_to_main_memory(main_mem.memory, page_number);
+                // Add page to main memory
+                // need to check if main memory is full and if it is then run a page swap algorithm
+                frame_number = add_page_to_main_memory(main_mem.memory, page_number);
 
-            // Remove from blocked queue
-            dequeue(&blocked);
+                // add frame number to page table
+                add_frame_to_page_table(frame_number, page_table, pid);
 
-            // Send message
+                // Remove from blocked queue
+                dequeue(&blocked);
 
+                // Send message
+                send_msg(mem_msg_box_id, &mem_msg_box, pid + MAX_PROC_CNT);
+
+                sprintf(buffer, "\n");
+                print_and_write(buffer, fp);
+            }
         }
-
+        
         // Get number of messages
         msgctl(mem_msg_box_id, IPC_STAT, &msgq_ds);
         num_messages = msgq_ds.msg_qnum;
@@ -227,7 +236,7 @@ int main (int argc, char* argv[]) {
 
                         // Store blocked information
                         blkd_info.page_number = msg.page;
-                        sprintf(blkd_info.type_of_request, msg.txt);
+                        strcpy(blkd_info.type_of_request, msg.txt);
                         
                         // Write out time process will be unblocked
                         blkd_info.time_unblocked = *sysclock;
@@ -510,4 +519,29 @@ struct BlockedInfo get_blocked_info() {
         .type_of_request = ""
     };
     return binfo;
+}
+
+int add_page_to_main_memory(int* main_mem, int page_number) {
+    char buffer[256];
+    int free_frame_number = get_free_frame_number(main_mem);
+
+    if (main_memory_is_full(free_frame_number)) {
+        // Page swap
+        free_frame_number = get_frame_number_to_swap();
+
+        sprintf(buffer, "     Main memory is full so swapping page %d in frame %d with page %d\n",
+            main_mem[free_frame_number], free_frame_number, page_number);
+        print_and_write(buffer, fp);
+
+    }
+    else {
+        // Just put page in main memory
+        sprintf(buffer, "     Main memory is not full so putting page %d in frame %d\n",
+            page_number, free_frame_number);
+        print_and_write(buffer, fp);
+    }
+    
+    main_mem[free_frame_number] = page_number;
+
+    return free_frame_number;
 }

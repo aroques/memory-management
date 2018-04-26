@@ -109,18 +109,6 @@ void free_frames(int* main_mem, int* page_table, int pid) {
     return;
 }
 
-void add_page_to_main_memory(int* main_mem, int page_number) {
-    int i;
-    int free_frame_number = get_free_frame_number(main_mem);
-
-    if (main_memory_is_full(free_frame_number)) {
-        // Page swap
-    }
-    else {
-        // Just put page in main memory
-    }
-}
-
 int get_free_frame_number(int* main_mem) {
     int i;
     for (i = 0; i < MAIN_MEMORY_SZE; i++) {
@@ -137,4 +125,21 @@ bool main_memory_is_full(int free_frame_number) {
         return 1;
     }
     return 0;
+}
+
+int get_frame_number_to_swap() {
+    return rand() % MAIN_MEMORY_SZE;
+}
+
+void add_frame_to_page_table(int frame_number, int* page_table, int pid) {
+    int start_index = get_start_index(pid);
+    int end_index = get_end_index(start_index);
+    int i;
+    for (i = start_index; i < end_index; i++) {
+        if (page_table[i] != 0) {
+            continue;
+        }
+        // No entry in page table
+        page_table[i] = frame_number;
+    }
 }
