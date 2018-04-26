@@ -257,18 +257,17 @@ int main (int argc, char* argv[]) {
                             pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
                         print_and_write(buffer, fp);
                         
+                        // Store blocked information in struct
                         blkd_info = get_blocked_info();
-
-                        // Store blocked information
                         blkd_info.page_number = msg.page;
                         strcpy(blkd_info.type_of_request, msg.txt);
-                        
-                        // Write out time process will be unblocked
                         blkd_info.time_unblocked = *sysclock;
-                        increment_clock(&blkd_info.time_unblocked, FIFTEEN_MILLION); // 15ms
-                                            
-                        // Store blocked information in array
+                                        
+                        // Store blocked information in blocked info array
                         blocked_info[pid] = blkd_info;
+                        
+                        // Increment clock 15ms
+                        increment_clock(&blkd_info.time_unblocked, FIFTEEN_MILLION);   
 
                         // Add process to blocked queue
                         enqueue(&blocked, pid);
