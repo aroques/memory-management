@@ -94,7 +94,7 @@ int get_frame_from_main_memory(int* main_mem, int page_number) {
     return -1;
 }
 
-void free_frames(int* main_mem, int* page_table, int pid) {
+void free_frames(struct MainMemory main_mem, int* page_table, int pid) {
     int start_index = get_start_index(pid);
     int end_index = get_end_index(start_index);
     int i, frame_number;
@@ -104,7 +104,8 @@ void free_frames(int* main_mem, int* page_table, int pid) {
             continue;
         }
         frame_number = page_table[i];
-        main_mem[frame_number] = 0;
+        main_mem.memory[frame_number] = 0;
+        main_mem.dirty[frame_number] = 0;
         page_table[i] = 0;
     }
     return;

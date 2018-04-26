@@ -173,7 +173,7 @@ int main (int argc, char* argv[]) {
             unblocked_time = blkd_info.time_unblocked;
 
             if (is_unblocked(pid, unblocked_time)) {
-                // If process is unblocked
+                // Process is unblocked
                 page_number = blkd_info.page_number;
 
                 sprintf(buffer, "\nOSS: 15ms have passed. Unblocking P%d and granting %s access on page %d at time %ld:%'ld.\n",
@@ -186,12 +186,18 @@ int main (int argc, char* argv[]) {
                 // Add frame number to page table
                 add_frame_to_page_table(frame_number, page_table, pid);
 
+                // Mark frame as dirty if write
+                if (strcmp(blkd_info.type_of_request, "WRITE") == 0) {
+                    main_mem.dirty[frame_number] = 1;
+                }
+
                 // Remove from blocked queue
                 dequeue(&blocked);
 
                 // Send message
                 send_msg(out_msg_box_id, &out_msg_box, pid);
 
+                // Update stats
                 stats.num_memory_accesses++;
             }
 
@@ -200,6 +206,7 @@ int main (int argc, char* argv[]) {
                 
                 difference = subtract_clocks(unblocked_time, *sysclock);
                 
+                // Increment sysclock to unblock 1 process 
                 *sysclock = unblocked_time;
                 
                 sprintf(buffer, "\nOSS: All processes blocked because of page faults. Incrementing clock %ld:%'ld to unblock 1 process at time %ld:%'ld.\n\n",
@@ -237,6 +244,7 @@ int main (int argc, char* argv[]) {
                     childpids[pid] = 0;
                     proc_cnt--;
 
+                    // Update stats
                     stats.num_seg_faults++;
                 }
                 else {
@@ -258,29 +266,36 @@ int main (int argc, char* argv[]) {
                         // Write out time process will be unblocked
                         blkd_info.time_unblocked = *sysclock;
                         increment_clock(&blkd_info.time_unblocked, FIFTEEN_MILLION); // 15ms
-
-                        stats.total_mem_access_time += FIFTEEN_MILLION;
-                        
+                                            
                         // Store blocked information in array
                         blocked_info[pid] = blkd_info;
 
                         // Add process to blocked queue
                         enqueue(&blocked, pid);
-
+                        
+                        // Update stats
                         stats.num_page_faults++;
+                        stats.total_mem_access_time += FIFTEEN_MILLION;
                     }
                     else {
-                        // Page is in frame already
+                        // Page is in main memory frame already
                         sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
                             pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
                         print_and_write(buffer, fp);
                         
+                        // Increment clock and update stats
                         increment_clock(sysclock, request_time);
                         stats.total_mem_access_time += request_time;
+                        
+                        // Mark frame as dirty if write
+                        if (strcmp(msg.txt, "WRITE") == 0) {
+                            main_mem.dirty[frame_number] = 1;
+                        }
 
                         // Send message
                         send_msg(out_msg_box_id, &out_msg_box, pid);
 
+                        // Update stats
                         stats.num_memory_accesses++;
                     }
                 }
@@ -300,6 +315,7 @@ int main (int argc, char* argv[]) {
             }
         }
 
+        // Increment clock a bit to simulate time passing
         increment_clock(sysclock, get_nanoseconds());
 
         // Calculate total elapsed real-time seconds
@@ -309,6 +325,7 @@ int main (int argc, char* argv[]) {
 
     print_exit_reason(proc_cnt);
 
+    // Load stats with pertinent information
     stats.num_seconds = clock_to_seconds(*sysclock);
     stats.proc_cnt = total_procs;
 
@@ -386,7 +403,7 @@ void kill_process(int pid) {
             // Child process exists and kill failed
             perror("kill");
         }
-    } 
+    }
 }
 
 void add_signal_handlers() {
