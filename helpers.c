@@ -93,6 +93,16 @@ bool event_occured(unsigned int pct_chance) {
     }
 }
 
+bool event_occured_out_of_one_thousand(unsigned int chance) {
+    unsigned int number = (rand() % 10000) + 1;
+    if (number <= chance) {
+        return 1;
+    }
+    else {
+        return 0;
+    }
+}
+
 unsigned int** create_array(int m, int n) {
     // Creates a m rows x n column matrix
     unsigned int* values = calloc(m * n, sizeof(unsigned int));

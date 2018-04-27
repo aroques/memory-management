@@ -69,7 +69,7 @@ int get_start_index(int pid) {
 }
 
 int get_end_index(int start_index) {
-    return (start_index + PROCESS_PAGES) - 1;
+    return start_index + PROCESS_PAGES;
 }
 
 bool page_number_is_valid(int pid, int page_number) {
@@ -168,12 +168,60 @@ void add_frame_to_page_table(int frame_number, int* page_table, int pid) {
         }
         // No entry in page table
         page_table[i] = frame_number;
+        
+        break;
     }
 }
 
-void print_main_memory(struct MainMemory main_mem) {
+void print_frames(int* page_table, int pid) {
+    int start_index = get_start_index(pid);
+    int end_index = get_end_index(start_index);
     int i;
-    for (i = 0; i < MAIN_MEMORY_SZE; i++) {
-        
+    printf("pages = %d\n", end_index - start_index);
+    for (i = start_index; i < end_index; i++) {
+        if (page_table[i] != 0) {
+            printf("%3d ", page_table[i]);
+        }
+        else {
+            printf(". ");
+        }
     }
+    printf("\n");
+}
+
+void print_main_memory(FILE* fp, struct MainMemory main_mem) {
+    char buffer[1000];
+    int i;
+    sprintf(buffer, "Main Memory\n  ");
+    for (i = 0; i < MAIN_MEMORY_SZE; i++) {
+        if (main_mem.memory[i] == 0) {
+            sprintf(buffer + strlen(buffer), ".");
+        }
+        else if (main_mem.dirty[i]) {
+            sprintf(buffer + strlen(buffer), "D");
+        }
+        else {
+            // Occupied Frame
+            sprintf(buffer + strlen(buffer), "U");
+        }
+    }
+
+    sprintf(buffer + strlen(buffer), "\n  ");
+
+    for (i = 0; i < MAIN_MEMORY_SZE; i++) {
+        if (main_mem.memory[i] == 0) {
+            sprintf(buffer + strlen(buffer), ".");
+        }
+        else if (main_mem.second_chance[i]) {
+            sprintf(buffer + strlen(buffer), "1");
+        }
+        else {
+            // second chance bit is not set
+            sprintf(buffer + strlen(buffer), "0");
+        }
+    }
+
+    sprintf(buffer + strlen(buffer), "\n");
+
+    print_and_write(buffer, fp);
 }

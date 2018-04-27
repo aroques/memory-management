@@ -28,9 +28,9 @@ int get_num_mem_references();
 
 void get_reference_type(char* reference_type);
 
-const unsigned int CHANCE_TERMINATE = 50;
-const unsigned int CHANCE_SEG_FAULT = 4;
-const unsigned int CHANCE_READ = 70;
+const unsigned int CHANCE_TERMINATE = 1; // out of 100
+const unsigned int CHANCE_SEG_FAULT = 1; // out of 10,000
+const unsigned int CHANCE_READ = 97;
 
 int main (int argc, char *argv[]) {
     add_signal_handlers();
@@ -87,7 +87,7 @@ int main (int argc, char *argv[]) {
 }
 
 bool will_seg_fault() {
-    return event_occured(CHANCE_SEG_FAULT);
+    return event_occured_out_of_one_thousand(CHANCE_SEG_FAULT);
 }
 
 bool will_terminate() {

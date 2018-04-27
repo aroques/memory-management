@@ -12,5 +12,6 @@ bool event_occured(unsigned int pct_chance);
 unsigned int** create_array(int m, int n);
 void destroy_array(unsigned int** arr);
 void print_and_write(char* str, FILE* fp);
+bool event_occured_out_of_one_thousand(unsigned int chance);
 
 #endif

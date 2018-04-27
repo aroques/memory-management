@@ -202,6 +202,7 @@ int main (int argc, char* argv[]) {
 
                 // Update stats
                 stats.num_memory_accesses++;
+    
             }
 
             // Check if all processes are blocked
@@ -249,6 +250,9 @@ int main (int argc, char* argv[]) {
 
                     // Update stats
                     stats.num_seg_faults++;
+
+                    // Print memory map
+                    print_main_memory(fp, main_mem);
                 }
                 else {
                     // Page number is valid
@@ -281,9 +285,9 @@ int main (int argc, char* argv[]) {
                     }
                     else {
                         // Page is in main memory frame already
-                        sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
-                            pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
-                        print_and_write(buffer, fp);
+                        // sprintf(buffer, "OSS: Granting P%d %s access on page %d at time %ld:%'ld\n",
+                        //     pid, msg.txt, msg.page, sysclock->seconds, sysclock->nanoseconds);
+                        // print_and_write(buffer, fp);
                         
                         // Increment clock and update stats
                         increment_clock(sysclock, request_time);
@@ -317,6 +321,10 @@ int main (int argc, char* argv[]) {
                 // Free space in childpids array
                 childpids[pid] = 0;
                 proc_cnt--;
+
+                // Print memory map
+                print_main_memory(fp, main_mem);
+                
             }
         }
 
@@ -467,7 +475,7 @@ struct clock get_time_to_fork_new_proc(struct clock sysclock) {
 }
 
 unsigned int get_nanoseconds() {
-    return (rand() % 1000) + 250; // 500 - 5,000 inclusive
+    return (rand() % 50000) + 10000; // 500 - 5,000 inclusive
 }
 
 int get_available_pid() {
