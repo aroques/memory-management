@@ -581,6 +581,14 @@ int add_page_to_main_memory(struct MainMemory* main_mem, int page_number) {
             main_mem->memory[free_frame_number], free_frame_number, page_number);
         print_and_write(buffer, fp);
 
+        if (main_mem->dirty[free_frame_number]) {
+            // Swapping out a dirty page
+            sprintf(buffer, "     Swapping out a dirty page, so incrementing the clock 15ms to simulate saving contents of the page to disk at time %ld:%'ld.\n\n",
+                sysclock->seconds, sysclock->nanoseconds);
+            print_and_write(buffer, fp);
+
+            increment_clock(sysclock, FIFTEEN_MILLION);
+        }
     }
     else {
         // Just put page in main memory
